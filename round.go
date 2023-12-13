@@ -26,6 +26,7 @@ The main steps of the algorithm are:
 */
 
 import (
+	"fmt"
 	"math/big"
 	"sort"
 )
@@ -92,7 +93,6 @@ func groupAndRoundCensus(participants []*Participant, privacyThreshold int, grou
 				currentGroup = []*Participant{participant}
 			}
 		}
-
 		// Ensure the last group is added
 		if i == len(participants)-1 {
 			groups = append(groups, currentGroup)
@@ -102,4 +102,28 @@ func groupAndRoundCensus(participants []*Participant, privacyThreshold int, grou
 	roundedCensus := roundGroups(groups)
 	accuracy := calculateAccuracy(participants, roundedCensus)
 	return roundedCensus, accuracy
+}
+
+func GroupAndRoundCensus(participants []*Participant, minPrivacyThreshold int, groupBalanceDiff *big.Int, minAccuracy float64) ([]*Participant, float64, error) {
+	privacyThreshold := len(participants) / 2
+	nearAccuracy := minAccuracy * 0.9
+	for {
+		if privacyThreshold <= minPrivacyThreshold {
+			return nil, 0.0, fmt.Errorf("could not find a privacy threshold that satisfies the minimum accuracy")
+		}
+		_, lastAccuracy := groupAndRoundCensus(participants, privacyThreshold, groupBalanceDiff)
+		if lastAccuracy >= nearAccuracy {
+			break
+		}
+		privacyThreshold /= 2
+	}
+
+	for privacyThreshold > minPrivacyThreshold {
+		finalCensus, accuracy := groupAndRoundCensus(participants, privacyThreshold, groupBalanceDiff)
+		if accuracy >= minAccuracy {
+			return finalCensus, accuracy, nil
+		}
+		privacyThreshold--
+	}
+	return nil, nearAccuracy, fmt.Errorf("could not find a privacy threshold that satisfies the minimum accuracy")
 }
