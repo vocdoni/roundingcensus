@@ -51,8 +51,9 @@ func roundGroups(groups [][]*Participant) []*Participant {
 		if len(group) == 0 {
 			continue
 		}
-
-		lowestBalance := group[0].Balance
+		// lowestBalance := group[0].Balance
+		minBytes := findMinSignificantBytes(group) - 1
+		lowestBalance := roundToCommonPrefixLength(group[0].Balance, minBytes)
 		for _, participant := range group {
 			roundedCensus = append(roundedCensus, &Participant{Address: participant.Address, Balance: lowestBalance})
 		}
@@ -145,4 +146,27 @@ func detectLowerOutliers(participants []*Participant, lowerPercentile float64) (
 		}
 	}
 	return newParticipants, outliers
+}
+
+func findMinSignificantBytes(participants []*Participant) int {
+	minBytes := len(participants[0].Balance.Bytes())
+	for _, p := range participants {
+		bytes := len(p.Balance.Bytes())
+		if bytes < minBytes {
+			minBytes = bytes
+		}
+	}
+	return minBytes
+}
+
+// roundToCommonPrefixLength rounds a list of big integers to a common prefix length.
+func roundToCommonPrefixLength(number *big.Int, prefixLength int) *big.Int {
+	bytes := number.Bytes()
+	if len(bytes) < prefixLength {
+		return number
+	}
+	originalLength := len(bytes)
+	roundedBytes := bytes[:prefixLength]
+	roundedBytes = append(roundedBytes, make([]byte, originalLength-prefixLength)...)
+	return new(big.Int).SetBytes(roundedBytes)
 }
