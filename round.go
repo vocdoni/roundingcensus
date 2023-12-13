@@ -77,9 +77,11 @@ func calculateAccuracy(original, rounded []*Participant) float64 {
 func groupAndRoundCensus(participants []*Participant, privacyThreshold int, groupBalanceDiff *big.Int) ([]*Participant, float64) {
 	sort.Sort(ByBalance(participants))
 
+	cleanedParticipants, outliers := detectLowerOutliers(participants, 5.0)
+
 	var groups [][]*Participant
 	var currentGroup []*Participant
-	for i, participant := range participants {
+	for i, participant := range cleanedParticipants {
 		if len(currentGroup) == 0 {
 			currentGroup = append(currentGroup, participant)
 		} else {
@@ -94,14 +96,14 @@ func groupAndRoundCensus(participants []*Participant, privacyThreshold int, grou
 			}
 		}
 		// Ensure the last group is added
-		if i == len(participants)-1 {
+		if i == len(cleanedParticipants)-1 {
 			groups = append(groups, currentGroup)
 		}
 	}
 
 	roundedCensus := roundGroups(groups)
-	accuracy := calculateAccuracy(participants, roundedCensus)
-	return roundedCensus, accuracy
+	accuracy := calculateAccuracy(cleanedParticipants, roundedCensus)
+	return append(outliers, roundedCensus...), accuracy
 }
 
 func GroupAndRoundCensus(participants []*Participant, minPrivacyThreshold int, groupBalanceDiff *big.Int, minAccuracy float64) ([]*Participant, float64, error) {

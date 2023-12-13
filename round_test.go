@@ -127,14 +127,20 @@ func TestAutoRoundingAlgorithm(t *testing.T) {
 			groupsCounters[p.Balance.String()]++
 		}
 	}
-	t.Log("Original census:")
-	for _, p := range census {
-		t.Logf("%s: %d\n", p.Address, p.Balance)
+	fd, err := os.Create("rounded-census.json")
+	if err != nil {
+		t.Fatalf("Error creating file: %v", err)
 	}
-	t.Log("Rounded census:")
+	defer fd.Close()
+	jsonCensus := map[string]string{}
 	for _, p := range roundedCensus {
-		t.Logf("%s: %d\n", p.Address, p.Balance)
+		jsonCensus[p.Address] = p.Balance.String()
 	}
+	jsonData, err := json.Marshal(jsonCensus)
+	if err != nil {
+		t.Fatalf("Error marshalling data: %v", err)
+	}
+	fd.Write(jsonData)
 	t.Logf("Min Privacy Threshold: %d, MinAccuracy: %.2f%%, Accuracy: %.2f%%, Groups: %d, Holders: %d\n",
 		minPrivacyThreshold, minAccuracy, accuracy, len(distinctBalances), len(census))
 }
