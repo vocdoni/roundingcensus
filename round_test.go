@@ -127,9 +127,14 @@ func TestAutoRoundingAlgorithm(t *testing.T) {
 			groupsCounters[p.Balance.String()]++
 		}
 	}
-	// for _, p := range roundedCensus {
-	// 	t.Logf("%s: %d\n", p.Address, p.Balance)
-	// }
+	t.Log("Original census:")
+	for _, p := range census {
+		t.Logf("%s: %d\n", p.Address, p.Balance)
+	}
+	t.Log("Rounded census:")
+	for _, p := range roundedCensus {
+		t.Logf("%s: %d\n", p.Address, p.Balance)
+	}
 	t.Logf("Min Privacy Threshold: %d, MinAccuracy: %.2f%%, Accuracy: %.2f%%, Groups: %d, Holders: %d\n",
 		minPrivacyThreshold, minAccuracy, accuracy, len(distinctBalances), len(census))
 }

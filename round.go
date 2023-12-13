@@ -127,3 +127,20 @@ func GroupAndRoundCensus(participants []*Participant, minPrivacyThreshold int, g
 	}
 	return nil, nearAccuracy, fmt.Errorf("could not find a privacy threshold that satisfies the minimum accuracy")
 }
+
+// detectLowerOutliers identifies and returns lower outliers based on a specified lower percentile.
+func detectLowerOutliers(participants []*Participant, lowerPercentile float64) ([]*Participant, []*Participant) {
+	thresholdIndex := int(lowerPercentile / 100 * float64(len(participants)))
+	thresholdValue := participants[thresholdIndex].Balance
+
+	newParticipants := []*Participant{}
+	outliers := []*Participant{}
+	for _, p := range participants {
+		if p.Balance.Cmp(thresholdValue) < 0 {
+			outliers = append(outliers, p)
+		} else {
+			newParticipants = append(newParticipants, p)
+		}
+	}
+	return newParticipants, outliers
+}
