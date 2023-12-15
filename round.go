@@ -126,12 +126,13 @@ func GroupAndRoundCensus(participants []*Participant, minPrivacyThreshold int, g
 		}
 		currentPrivacyThreshold += gap
 	}
-	roundCensus, finalAccuracy := groupAndRoundCensus(cleanedParticipants, maxAccuracyPrivacyThreshold, groupBalanceDiff)
-	roundCensus = append(roundCensus, outliers...)
-	if finalAccuracy < minAccuracy {
-		return roundCensus, finalAccuracy, maxAccuracyPrivacyThreshold, fmt.Errorf("could not find a privacy threshold that satisfies the minimum accuracy")
+	roundCensus, accuracy := groupAndRoundCensus(cleanedParticipants, maxAccuracyPrivacyThreshold, groupBalanceDiff)
+	outliersCensus, _ := groupAndRoundCensus(outliers, maxAccuracyPrivacyThreshold, groupBalanceDiff)
+	roundCensus = append(roundCensus, outliersCensus...)
+	if accuracy < minAccuracy {
+		return roundCensus, accuracy, maxAccuracyPrivacyThreshold, fmt.Errorf("could not find a privacy threshold that satisfies the minimum accuracy")
 	}
-	return roundCensus, finalAccuracy, maxAccuracyPrivacyThreshold, nil
+	return roundCensus, accuracy, maxAccuracyPrivacyThreshold, nil
 }
 
 // zScore identifies and returns outliers based on a specified z-score
