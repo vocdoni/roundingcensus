@@ -6,7 +6,9 @@ import (
 	"math/big"
 	"math/rand"
 	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -93,10 +95,15 @@ func TestAutoRoundingAlgorithm(t *testing.T) {
 
 	var err error
 	var census []*Participant
+	output_census := "anonymous_census.json"
 	if testCensus := os.Getenv("TEST_CENSUS"); testCensus != "" {
 		if census, err = openCensus(testCensus); err != nil {
 			t.Fatalf("Error opening census: %v", err)
 		}
+		census_filename := filepath.Base(testCensus)
+		census_ext := filepath.Ext(census_filename)
+		census_base := strings.TrimSuffix(census_filename, census_ext)
+		output_census = fmt.Sprintf("%s_anonymous%s", census_base, census_ext)
 	} else {
 		census = generateRandomCensus(censusSize, maxBalance)
 	}
@@ -126,7 +133,7 @@ func TestAutoRoundingAlgorithm(t *testing.T) {
 			groupsCounters[p.Balance.String()]++
 		}
 	}
-	fd, err := os.Create("anonymous_census.json")
+	fd, err := os.Create(output_census)
 	if err != nil {
 		t.Fatalf("Error creating file: %v", err)
 	}

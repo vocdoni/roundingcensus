@@ -1,0 +1,6 @@
+## Predefined parameters
+```sh
+MIN_PRIVACY_THRESHOLD=3 
+GROUP_BALANCE_DIFF=1 
+MIN_ACCURACY=50
+```
