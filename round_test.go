@@ -71,7 +71,8 @@ func TestRoundingAlgorithm(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error parsing GROUP_BALANCE_DIFF: %v", err)
 	}
-	roundedCensus, accuracy := groupAndRoundCensus(census, privacyThreshold, big.NewInt(int64(groupBalanceDiff)))
+	roundedCensus := groupAndRoundCensus(census, privacyThreshold, big.NewInt(int64(groupBalanceDiff)))
+	accuracy := calculateAccuracy(census, roundedCensus)
 	distinctBalances := []string{}
 	groupsCounters := map[string]int{}
 	for _, p := range roundedCensus {
@@ -82,9 +83,6 @@ func TestRoundingAlgorithm(t *testing.T) {
 			groupsCounters[p.Balance.String()]++
 		}
 	}
-	//	for _, p := range roundedCensus {
-	//		t.Logf("%s: %d\n", p.Address, p.Balance)
-	//	}
 	t.Logf("Privacy Threshold: %d, Accuracy: %.2f%%, Groups: %d, Holders: %d\n",
 		privacyThreshold, accuracy, len(distinctBalances), len(census))
 }
@@ -95,15 +93,16 @@ func TestAutoRoundingAlgorithm(t *testing.T) {
 
 	var err error
 	var census []*Participant
-	output_census := "anonymous_census.json"
+	output_census := "./census_rounded.json"
 	if testCensus := os.Getenv("TEST_CENSUS"); testCensus != "" {
 		if census, err = openCensus(testCensus); err != nil {
 			t.Fatalf("Error opening census: %v", err)
 		}
 		census_filename := filepath.Base(testCensus)
+		census_folder := strings.TrimSuffix(testCensus, census_filename)
 		census_ext := filepath.Ext(census_filename)
 		census_base := strings.TrimSuffix(census_filename, census_ext)
-		output_census = fmt.Sprintf("%s_anonymous%s", census_base, census_ext)
+		output_census = fmt.Sprintf("%s%s_rounded.json", census_folder, census_base)
 	} else {
 		census = generateRandomCensus(censusSize, maxBalance)
 	}
@@ -121,7 +120,7 @@ func TestAutoRoundingAlgorithm(t *testing.T) {
 		t.Fatalf("Error parsing GROUP_BALANCE_DIFF: %v", err)
 	}
 
-	roundedCensus, accuracy, finalPrivacyThreshold, err := GroupAndRoundCensus(census, minPrivacyThreshold, big.NewInt(int64(groupBalanceDiff)), minAccuracy)
+	roundedCensus, accuracy, err := GroupAndRoundCensus(census, minPrivacyThreshold, big.NewInt(int64(groupBalanceDiff)), minAccuracy)
 	if err != nil {
 		t.Fatalf("Error rounding census: %v", err)
 	}
@@ -148,6 +147,6 @@ func TestAutoRoundingAlgorithm(t *testing.T) {
 		t.Fatalf("Error marshalling data: %v", err)
 	}
 	fd.Write(jsonData)
-	t.Logf("Min Privacy Threshold: %d, Privacy Threshold: %d, MinAccuracy: %.2f%%, Accuracy: %.2f%%, Groups: %d, Holders: %d\n",
-		minPrivacyThreshold, finalPrivacyThreshold, minAccuracy, accuracy, len(groupsCounters), len(census))
+	t.Logf("Min Privacy Threshold: %d, MinAccuracy: %.2f%%, Accuracy: %.2f%%, Groups: %d, Holders: %d\n",
+		minPrivacyThreshold, minAccuracy, accuracy, len(groupsCounters), len(census))
 }

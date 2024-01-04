@@ -67,14 +67,17 @@ func calculateAccuracy(original, rounded []*Participant) float64 {
 		totalOriginal.Add(&totalOriginal, original[i].Balance)
 		totalRounded.Add(&totalRounded, rounded[i].Balance)
 	}
-	lostWeight := new(big.Float).Sub(new(big.Float).SetInt(&totalOriginal), new(big.Float).SetInt(&totalRounded))
 	totalOriginalFloat := new(big.Float).SetInt(&totalOriginal)
+	if totalOriginalFloat.Cmp(big.NewFloat(0)) == 0 {
+		return 0
+	}
+	lostWeight := new(big.Float).Sub(totalOriginalFloat, new(big.Float).SetInt(&totalRounded))
 	accuracy, _ := new(big.Float).Quo(lostWeight, totalOriginalFloat).Float64()
 	return 100 - (accuracy * 100)
 }
 
 // groupAndRoundCensus groups the cleanedParticipants and rounds their balances.
-func groupAndRoundCensus(participants []*Participant, privacyThreshold int, groupBalanceDiff *big.Int) ([]*Participant, float64) {
+func groupAndRoundCensus(participants []*Participant, privacyThreshold int, groupBalanceDiff *big.Int) []*Participant {
 	sort.Sort(ByBalance(participants))
 	var groups [][]*Participant
 	var currentGroup []*Participant
@@ -98,24 +101,22 @@ func groupAndRoundCensus(participants []*Participant, privacyThreshold int, grou
 		}
 	}
 	roundedCensus := roundGroups(groups)
-	accuracy := calculateAccuracy(participants, roundedCensus)
-	return roundedCensus, accuracy
+	return roundedCensus
 }
 
 // GroupAndRoundCensus groups the participants and rounds their balances. It
 // rounds the balances of the participants with the highest accuracy possible
 // while maintaining a minimum privacy threshold. It discards outliers from the
 // rounding process but returns them in the final list of participants.
-func GroupAndRoundCensus(participants []*Participant, minPrivacyThreshold int, groupBalanceDiff *big.Int, minAccuracy float64) ([]*Participant, float64, int, error) {
-	// cleanedParticipants, outliers := detectLowerOutliers(participants, 5.0)
-	cleanedParticipants, outliers := zScore(participants, 2.0)
+func GroupAndRoundCensus(participants []*Participant, minPrivacyThreshold int, groupBalanceDiff *big.Int, minAccuracy float64) ([]*Participant, float64, error) {
+	cleanedParticipants, outliers := zScore(participants, 5)
 
 	maxPrivacyThreshold := len(participants) / minPrivacyThreshold
 	currentPrivacyThreshold := minPrivacyThreshold
 	maxAccuracy := 0.0
 	maxAccuracyPrivacyThreshold := currentPrivacyThreshold
 	for currentPrivacyThreshold <= maxPrivacyThreshold {
-		_, lastAccuracy := groupAndRoundCensus(cleanedParticipants, currentPrivacyThreshold, groupBalanceDiff)
+		lastAccuracy := calculateAccuracy(cleanedParticipants, groupAndRoundCensus(cleanedParticipants, currentPrivacyThreshold, groupBalanceDiff))
 		if lastAccuracy > maxAccuracy {
 			maxAccuracy = lastAccuracy
 			maxAccuracyPrivacyThreshold = currentPrivacyThreshold
@@ -126,14 +127,14 @@ func GroupAndRoundCensus(participants []*Participant, minPrivacyThreshold int, g
 		}
 		currentPrivacyThreshold += gap
 	}
-	roundCensus, commonAccuracy := groupAndRoundCensus(cleanedParticipants, maxAccuracyPrivacyThreshold, groupBalanceDiff)
-	outliersCensus, outliersAccuracy := groupAndRoundCensus(outliers, maxAccuracyPrivacyThreshold, groupBalanceDiff)
-	roundCensus = append(roundCensus, outliersCensus...)
-	accuracy := (commonAccuracy + outliersAccuracy) / 2
+	roundedCensus := groupAndRoundCensus(cleanedParticipants, maxAccuracyPrivacyThreshold, groupBalanceDiff)
+	outliersCensus := groupAndRoundCensus(outliers, maxAccuracyPrivacyThreshold, groupBalanceDiff)
+	roundedCensus = append(roundedCensus, outliersCensus...)
+	accuracy := calculateAccuracy(participants, roundedCensus)
 	if accuracy < minAccuracy {
-		return roundCensus, accuracy, maxAccuracyPrivacyThreshold, fmt.Errorf("could not find a privacy threshold that satisfies the minimum accuracy")
+		return roundedCensus, accuracy, fmt.Errorf("could not find a privacy threshold that satisfies the minimum accuracy")
 	}
-	return roundCensus, accuracy, maxAccuracyPrivacyThreshold, nil
+	return roundedCensus, accuracy, nil
 }
 
 // zScore identifies and returns outliers based on a specified z-score
@@ -169,27 +170,13 @@ func zScore(participants []*Participant, threshold float64) ([]*Participant, []*
 		// z-score = (value - mean) / standard deviation
 		fBalance := new(big.Float).SetInt(p.Balance)
 		diff := new(big.Float).Sub(fBalance, mean)
+		if stdDev.Cmp(big.NewFloat(0)) == 0 {
+			newParticipants = append(newParticipants, p)
+			continue
+		}
 		zScore := new(big.Float).Quo(diff, stdDev)
 		// if z-score is greater than threshold, it is an outlier
 		if zScore.Abs(zScore).Cmp(big.NewFloat(threshold)) > 0 {
-			outliers = append(outliers, p)
-		} else {
-			newParticipants = append(newParticipants, p)
-		}
-	}
-	return newParticipants, outliers
-}
-
-// detectLowerOutliers identifies and returns lower outliers based on a specified lower percentile.
-func detectLowerOutliers(participants []*Participant, lowerPercentile float64) ([]*Participant, []*Participant) {
-	sort.Sort(ByBalance(participants))
-	thresholdIndex := int(lowerPercentile / 100 * float64(len(participants)))
-	thresholdValue := participants[thresholdIndex].Balance
-
-	newParticipants := []*Participant{}
-	outliers := []*Participant{}
-	for _, p := range participants {
-		if p.Balance.Cmp(thresholdValue) < 0 {
 			outliers = append(outliers, p)
 		} else {
 			newParticipants = append(newParticipants, p)
