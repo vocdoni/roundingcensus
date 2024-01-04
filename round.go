@@ -109,7 +109,7 @@ func groupAndRoundCensus(participants []*Participant, privacyThreshold int, grou
 // while maintaining a minimum privacy threshold. It discards outliers from the
 // rounding process but returns them in the final list of participants.
 func GroupAndRoundCensus(participants []*Participant, minPrivacyThreshold int, groupBalanceDiff *big.Int, minAccuracy float64) ([]*Participant, float64, error) {
-	cleanedParticipants, outliers := zScore(participants, 5)
+	cleanedParticipants, outliers := zScore(participants, 2)
 
 	maxPrivacyThreshold := len(participants) / minPrivacyThreshold
 	currentPrivacyThreshold := minPrivacyThreshold
