@@ -107,20 +107,29 @@ func TestAutoRoundingAlgorithm(t *testing.T) {
 		census = generateRandomCensus(censusSize, maxBalance)
 	}
 
+	groupBalanceDiff, err := strconv.Atoi(os.Getenv("GROUP_BALANCE_DIFF"))
+	if err != nil {
+		t.Fatalf("Error parsing GROUP_BALANCE_DIFF: %v", err)
+	}
 	minPrivacyThreshold, err := strconv.Atoi(os.Getenv("MIN_PRIVACY_THRESHOLD"))
 	if err != nil {
-		t.Fatalf("Error parsing MIN_PRIVACY_THRESHOLD: %v", err)
+		minPrivacyThreshold = DefaultMinPrivacyThreshold
 	}
 	minAccuracy, err := strconv.ParseFloat(os.Getenv("MIN_ACCURACY"), 64)
 	if err != nil {
 		t.Fatalf("Error parsing MIN_ACCURACY: %v", err)
 	}
-	groupBalanceDiff, err := strconv.Atoi(os.Getenv("GROUP_BALANCE_DIFF"))
+	outliersThreshold, err := strconv.ParseFloat(os.Getenv("OUTLIERS_THRESHOLD"), 64)
 	if err != nil {
-		t.Fatalf("Error parsing GROUP_BALANCE_DIFF: %v", err)
+		outliersThreshold = DefaultOutliersThreshold
 	}
 
-	roundedCensus, accuracy, err := GroupAndRoundCensus(census, minPrivacyThreshold, big.NewInt(int64(groupBalanceDiff)), minAccuracy)
+	roundedCensus, accuracy, err := GroupAndRoundCensus(census, GroupsConfig{
+		GroupBalanceDiff:    big.NewInt(int64(groupBalanceDiff)),
+		MinPrivacyThreshold: minPrivacyThreshold,
+		MinAccuracy:         minAccuracy,
+		OutliersThreshold:   outliersThreshold,
+	})
 	if err != nil {
 		t.Fatalf("Error rounding census: %v", err)
 	}
@@ -146,7 +155,9 @@ func TestAutoRoundingAlgorithm(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error marshalling data: %v", err)
 	}
-	fd.Write(jsonData)
-	t.Logf("Min Privacy Threshold: %d, MinAccuracy: %.2f%%, Accuracy: %.2f%%, Groups: %d, Holders: %d\n",
-		minPrivacyThreshold, minAccuracy, accuracy, len(groupsCounters), len(census))
+	if _, err := fd.Write(jsonData); err != nil {
+		t.Fatalf("Error writing data: %v", err)
+	}
+	t.Logf("MinAccuracy: %.2f, Accuracy: %.2f%%, Groups: %d, Holders: %d\n",
+		minAccuracy, accuracy, len(groupsCounters), len(census))
 }

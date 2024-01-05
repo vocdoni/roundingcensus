@@ -1,10 +1,10 @@
 package roundedcensus
 
 /*
-Package roundedcensus provides an algorithm to anonymize participant balances in a voting system
-while maintaining a certain level of accuracy. It sorts participants by balance, groups them
-based on a privacy threshold and balance differences, rounds their balances, and calculates
-lost balance for accuracy measurement.
+roundedcensus package provides an algorithm to anonymize participant balances in
+a voting system while maintaining a certain level of accuracy. It sorts participants
+by balance, groups them based on a privacy threshold and balance differences,
+rounds their balances, and calculates lost balance for accuracy measurement.
 
 The main steps of the algorithm are:
 
@@ -18,11 +18,17 @@ The main steps of the algorithm are:
      equal to the groupBalanceDiff threshold.
 
 3. Round Group Balances:
-   - Each group's balances are rounded down to the lowest value within that group.
+   - Each group's balances are rounded down to the lowest common value within
+     that group.
 
-4. Output Rounded Balances and Accuracy:
-   - The algorithm provides the new list of participants with their rounded balances
-     and the calculated accuracy to quantify the balance preservation.
+4. (optional) Accuracy loop:
+   - The algorithm tries to find the highest accuracy possible while maintaining
+     a minimum privacy threshold. It starts with the minimum privacy threshold
+	 and increases it by a small amount until the accuracy is maximized.
+
+5. Output Rounded Balances and Accuracy:
+   - The algorithm provides the new list of participants with their rounded
+     balances and the calculated accuracy to quantify the balance preservation.
 */
 
 import (
@@ -30,6 +36,23 @@ import (
 	"math/big"
 	"sort"
 )
+
+const (
+	DefaultMinPrivacyThreshold = 3
+	DefaultOutliersThreshold   = 2.0
+)
+
+// GroupsConfig represents the configuration for the grouping and rounding process.
+type GroupsConfig struct {
+	// GroupBalanceDiff is the maximum difference between consecutive balances
+	GroupBalanceDiff *big.Int
+	// MinPrivacyThreshold is the minimum number of participants in a group.
+	MinPrivacyThreshold int
+	// MinAccuracy is the minimum accuracy required for the rounding process.
+	MinAccuracy float64
+	// OutliersThreshold is the z-score threshold for identifying outliers.
+	OutliersThreshold float64
+}
 
 // Participant represents a participant with an Ethereum address and balance.
 type Participant struct {
@@ -44,6 +67,40 @@ func (a ByBalance) Len() int           { return len(a) }
 func (a ByBalance) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a ByBalance) Less(i, j int) bool { return a[i].Balance.Cmp(a[j].Balance) < 0 }
 
+// GroupAndRoundCensus groups the participants and rounds their balances. It
+// rounds the balances of the participants with the highest accuracy possible
+// while maintaining a minimum privacy threshold. It discards outliers from the
+// rounding process but returns them in the final list of participants.
+func GroupAndRoundCensus(participants []*Participant, config GroupsConfig) ([]*Participant, float64, error) {
+	cleanedParticipants, outliers := zScore(participants, config.OutliersThreshold)
+
+	maxPrivacyThreshold := len(participants) / config.MinPrivacyThreshold
+	currentPrivacyThreshold := config.MinPrivacyThreshold
+	maxAccuracy := 0.0
+	maxAccuracyPrivacyThreshold := currentPrivacyThreshold
+	for currentPrivacyThreshold <= maxPrivacyThreshold {
+		groupedParticipants := groupAndRoundCensus(cleanedParticipants, currentPrivacyThreshold, config.GroupBalanceDiff)
+		lastAccuracy := calculateAccuracy(cleanedParticipants, groupedParticipants)
+		if lastAccuracy > maxAccuracy {
+			maxAccuracy = lastAccuracy
+			maxAccuracyPrivacyThreshold = currentPrivacyThreshold
+		}
+		gap := currentPrivacyThreshold / 33
+		if gap < 1 {
+			gap = 1
+		}
+		currentPrivacyThreshold += gap
+	}
+	roundedCensus := groupAndRoundCensus(cleanedParticipants, maxAccuracyPrivacyThreshold, config.GroupBalanceDiff)
+	outliersCensus := groupAndRoundCensus(outliers, maxAccuracyPrivacyThreshold, config.GroupBalanceDiff)
+	roundedCensus = append(roundedCensus, outliersCensus...)
+	accuracy := calculateAccuracy(participants, roundedCensus)
+	if accuracy < config.MinAccuracy {
+		return roundedCensus, accuracy, fmt.Errorf("could not find a privacy threshold that satisfies the minimum accuracy")
+	}
+	return roundedCensus, accuracy, nil
+}
+
 // roundGroups rounds the balances within each group to the lowest value in the group.
 func roundGroups(groups [][]*Participant) []*Participant {
 	roundedCensus := []*Participant{}
@@ -52,7 +109,6 @@ func roundGroups(groups [][]*Participant) []*Participant {
 			continue
 		}
 		lowestBalance := roundToFirstCommonDigit(group)
-		// lowestBalance := group[0].Balance
 		for _, participant := range group {
 			roundedCensus = append(roundedCensus, &Participant{Address: participant.Address, Balance: lowestBalance})
 		}
@@ -102,39 +158,6 @@ func groupAndRoundCensus(participants []*Participant, privacyThreshold int, grou
 	}
 	roundedCensus := roundGroups(groups)
 	return roundedCensus
-}
-
-// GroupAndRoundCensus groups the participants and rounds their balances. It
-// rounds the balances of the participants with the highest accuracy possible
-// while maintaining a minimum privacy threshold. It discards outliers from the
-// rounding process but returns them in the final list of participants.
-func GroupAndRoundCensus(participants []*Participant, minPrivacyThreshold int, groupBalanceDiff *big.Int, minAccuracy float64) ([]*Participant, float64, error) {
-	cleanedParticipants, outliers := zScore(participants, 2)
-
-	maxPrivacyThreshold := len(participants) / minPrivacyThreshold
-	currentPrivacyThreshold := minPrivacyThreshold
-	maxAccuracy := 0.0
-	maxAccuracyPrivacyThreshold := currentPrivacyThreshold
-	for currentPrivacyThreshold <= maxPrivacyThreshold {
-		lastAccuracy := calculateAccuracy(cleanedParticipants, groupAndRoundCensus(cleanedParticipants, currentPrivacyThreshold, groupBalanceDiff))
-		if lastAccuracy > maxAccuracy {
-			maxAccuracy = lastAccuracy
-			maxAccuracyPrivacyThreshold = currentPrivacyThreshold
-		}
-		gap := currentPrivacyThreshold / 33
-		if gap < 1 {
-			gap = 1
-		}
-		currentPrivacyThreshold += gap
-	}
-	roundedCensus := groupAndRoundCensus(cleanedParticipants, maxAccuracyPrivacyThreshold, groupBalanceDiff)
-	outliersCensus := groupAndRoundCensus(outliers, maxAccuracyPrivacyThreshold, groupBalanceDiff)
-	roundedCensus = append(roundedCensus, outliersCensus...)
-	accuracy := calculateAccuracy(participants, roundedCensus)
-	if accuracy < minAccuracy {
-		return roundedCensus, accuracy, fmt.Errorf("could not find a privacy threshold that satisfies the minimum accuracy")
-	}
-	return roundedCensus, accuracy, nil
 }
 
 // zScore identifies and returns outliers based on a specified z-score

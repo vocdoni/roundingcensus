@@ -1,19 +1,28 @@
 ## Summary
 
-**Config**
+### AutoRoundingAlgorithm test
+
+#### Config
+
 | Param | Value |
 |:---|---:|
-| `MIN_PRIVACY_THRESHOLD` | 3 |
+| `TEST_CENUS` *(optional)* | `/path/to/holders.json` |
+| `MIN_PRIVACY_THRESHOLD` *(optional)* | 3 |
+| `OUTLIERS_THRESHOLD` *(optional)* | 2.0 |
 | `MIN_ACCURACY` (%) | 50 |
 | `GROUP_BALANCE_DIFF` | 10 |
 
-**Command**
+<small>* Default values.</small>
+
+#### Example
 
 ```sh
-TEST_CENSUS=./holders.json MIN_PRIVACY_THRESHOLD=3 MIN_ACCURACY=50 GROUP_BALANCE_DIFF=10  go test -timeout 30s -v -run ^TestAutoRoundingAlgorithm$
+TEST_CENSUS=./holders.json MIN_PRIVACY_THRESHOLD=3 OUTLIERS_THRESHOLD=2 MIN_ACCURACY=50 GROUP_BALANCE_DIFF=10 go test -timeout 30s -v -run ^TestAutoRoundingAlgorithm$
 ```
 
-**Round results**
+#### Results
+
+View more detailed data analysis in individual folders.
 
 | Token name | Type | Holders | Accuracy | Groups | Time |
 |:---|:---|:---:|:---:|:---:|:---:|
