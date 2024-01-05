@@ -33,13 +33,14 @@ The main steps of the algorithm are:
 
 import (
 	"fmt"
+	"math"
 	"math/big"
 	"sort"
 )
 
 const (
-	DefaultMinPrivacyThreshold = 3
-	DefaultOutliersThreshold   = 2.0
+	DefaultMinPrivacyThreshold int64   = 3
+	DefaultOutliersThreshold   float64 = 2.0
 )
 
 // GroupsConfig represents the configuration for the grouping and rounding process.
@@ -47,7 +48,7 @@ type GroupsConfig struct {
 	// GroupBalanceDiff is the maximum difference between consecutive balances
 	GroupBalanceDiff *big.Int
 	// MinPrivacyThreshold is the minimum number of participants in a group.
-	MinPrivacyThreshold int
+	MinPrivacyThreshold int64
 	// MinAccuracy is the minimum accuracy required for the rounding process.
 	MinAccuracy float64
 	// OutliersThreshold is the z-score threshold for identifying outliers.
@@ -74,7 +75,7 @@ func (a ByBalance) Less(i, j int) bool { return a[i].Balance.Cmp(a[j].Balance) <
 func GroupAndRoundCensus(participants []*Participant, config GroupsConfig) ([]*Participant, float64, error) {
 	cleanedParticipants, outliers := zScore(participants, config.OutliersThreshold)
 
-	maxPrivacyThreshold := len(participants) / config.MinPrivacyThreshold
+	maxPrivacyThreshold := int64(len(participants)) / config.MinPrivacyThreshold
 	currentPrivacyThreshold := config.MinPrivacyThreshold
 	maxAccuracy := 0.0
 	maxAccuracyPrivacyThreshold := currentPrivacyThreshold
@@ -85,11 +86,7 @@ func GroupAndRoundCensus(participants []*Participant, config GroupsConfig) ([]*P
 			maxAccuracy = lastAccuracy
 			maxAccuracyPrivacyThreshold = currentPrivacyThreshold
 		}
-		gap := currentPrivacyThreshold / 33
-		if gap < 1 {
-			gap = 1
-		}
-		currentPrivacyThreshold += gap
+		currentPrivacyThreshold += roundGap(currentPrivacyThreshold)
 	}
 	roundedCensus := groupAndRoundCensus(cleanedParticipants, maxAccuracyPrivacyThreshold, config.GroupBalanceDiff)
 	outliersCensus := groupAndRoundCensus(outliers, maxAccuracyPrivacyThreshold, config.GroupBalanceDiff)
@@ -99,6 +96,19 @@ func GroupAndRoundCensus(participants []*Participant, config GroupsConfig) ([]*P
 		return roundedCensus, accuracy, fmt.Errorf("could not find a privacy threshold that satisfies the minimum accuracy")
 	}
 	return roundedCensus, accuracy, nil
+}
+
+// roundGap calculate the gap between privacy thresholds for the accuracy loop.
+// It returns the gap as a percentage of the current privacy threshold. The gap
+// is calculated as 5% of the current privacy threshold, rounded to the nearest
+// integer. If the gap is less than 1, it returns 1. The privacy threshold is
+// increased by the gap in each iteration of the accuracy loop.
+func roundGap(x int64) int64 {
+	gap := float64(x) * 0.05
+	if gap < 1 {
+		return 1
+	}
+	return int64(math.Round(gap))
 }
 
 // roundGroups rounds the balances within each group to the lowest value in the group.
@@ -133,7 +143,7 @@ func calculateAccuracy(original, rounded []*Participant) float64 {
 }
 
 // groupAndRoundCensus groups the cleanedParticipants and rounds their balances.
-func groupAndRoundCensus(participants []*Participant, privacyThreshold int, groupBalanceDiff *big.Int) []*Participant {
+func groupAndRoundCensus(participants []*Participant, privacyThreshold int64, groupBalanceDiff *big.Int) []*Participant {
 	sort.Sort(ByBalance(participants))
 	var groups [][]*Participant
 	var currentGroup []*Participant
@@ -144,7 +154,7 @@ func groupAndRoundCensus(participants []*Participant, privacyThreshold int, grou
 			lastParticipant := currentGroup[len(currentGroup)-1]
 			balanceDiff := new(big.Int).Abs(new(big.Int).Sub(participant.Balance, lastParticipant.Balance))
 
-			if len(currentGroup) < privacyThreshold || balanceDiff.Cmp(groupBalanceDiff) <= 0 {
+			if int64(len(currentGroup)) < privacyThreshold || balanceDiff.Cmp(groupBalanceDiff) <= 0 {
 				currentGroup = append(currentGroup, participant)
 			} else {
 				groups = append(groups, currentGroup)

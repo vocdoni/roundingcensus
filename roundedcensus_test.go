@@ -63,9 +63,9 @@ func TestRoundingAlgorithm(t *testing.T) {
 		census = generateRandomCensus(censusSize, maxBalance)
 	}
 
-	privacyThreshold, err := strconv.Atoi(os.Getenv("PRIVACY_THRESHOLD"))
-	if err != nil {
-		t.Fatalf("Error parsing PRIVACY_THRESHOLD: %v", err)
+	privacyThreshold := DefaultMinPrivacyThreshold
+	if iPrivacyThreshold, err := strconv.Atoi(os.Getenv("PRIVACY_THRESHOLD")); err == nil {
+		privacyThreshold = int64(iPrivacyThreshold)
 	}
 	groupBalanceDiff, err := strconv.Atoi(os.Getenv("GROUP_BALANCE_DIFF"))
 	if err != nil {
@@ -111,9 +111,9 @@ func TestAutoRoundingAlgorithm(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Error parsing GROUP_BALANCE_DIFF: %v", err)
 	}
-	minPrivacyThreshold, err := strconv.Atoi(os.Getenv("MIN_PRIVACY_THRESHOLD"))
-	if err != nil {
-		minPrivacyThreshold = DefaultMinPrivacyThreshold
+	minPrivacyThreshold := DefaultMinPrivacyThreshold
+	if iMinPrivacyThreshold, err := strconv.Atoi(os.Getenv("MIN_PRIVACY_THRESHOLD")); err == nil {
+		minPrivacyThreshold = int64(iMinPrivacyThreshold)
 	}
 	minAccuracy, err := strconv.ParseFloat(os.Getenv("MIN_ACCURACY"), 64)
 	if err != nil {
@@ -124,12 +124,15 @@ func TestAutoRoundingAlgorithm(t *testing.T) {
 		outliersThreshold = DefaultOutliersThreshold
 	}
 
-	roundedCensus, accuracy, err := GroupAndRoundCensus(census, GroupsConfig{
+	config := GroupsConfig{
 		GroupBalanceDiff:    big.NewInt(int64(groupBalanceDiff)),
 		MinPrivacyThreshold: minPrivacyThreshold,
 		MinAccuracy:         minAccuracy,
 		OutliersThreshold:   outliersThreshold,
-	})
+	}
+	t.Logf("current configuration: %+v", config)
+
+	roundedCensus, accuracy, err := GroupAndRoundCensus(census, config)
 	if err != nil {
 		t.Fatalf("Error rounding census: %v", err)
 	}
