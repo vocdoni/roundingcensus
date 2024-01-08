@@ -38,11 +38,6 @@ import (
 	"sort"
 )
 
-const (
-	DefaultMinPrivacyThreshold int64   = 3
-	DefaultOutliersThreshold   float64 = 2.0
-)
-
 // GroupsConfig represents the configuration for the grouping and rounding process.
 type GroupsConfig struct {
 	// GroupBalanceDiff is the maximum difference between consecutive balances
@@ -53,6 +48,13 @@ type GroupsConfig struct {
 	MinAccuracy float64
 	// OutliersThreshold is the z-score threshold for identifying outliers.
 	OutliersThreshold float64
+}
+
+var DefaultGroupsConfig GroupsConfig = GroupsConfig{
+	GroupBalanceDiff:    big.NewInt(10),
+	MinPrivacyThreshold: 3,
+	MinAccuracy:         50.0,
+	OutliersThreshold:   2.0,
 }
 
 // Participant represents a participant with an Ethereum address and balance.

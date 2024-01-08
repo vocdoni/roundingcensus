@@ -63,7 +63,7 @@ func TestRoundingAlgorithm(t *testing.T) {
 		census = generateRandomCensus(censusSize, maxBalance)
 	}
 
-	privacyThreshold := DefaultMinPrivacyThreshold
+	privacyThreshold := DefaultGroupsConfig.MinPrivacyThreshold
 	if iPrivacyThreshold, err := strconv.Atoi(os.Getenv("PRIVACY_THRESHOLD")); err == nil {
 		privacyThreshold = int64(iPrivacyThreshold)
 	}
@@ -106,31 +106,21 @@ func TestAutoRoundingAlgorithm(t *testing.T) {
 	} else {
 		census = generateRandomCensus(censusSize, maxBalance)
 	}
-
-	groupBalanceDiff, err := strconv.Atoi(os.Getenv("GROUP_BALANCE_DIFF"))
-	if err != nil {
-		t.Fatalf("Error parsing GROUP_BALANCE_DIFF: %v", err)
+	config := DefaultGroupsConfig
+	if groupBalanceDiff, err := strconv.Atoi(os.Getenv("GROUP_BALANCE_DIFF")); err == nil {
+		config.GroupBalanceDiff = big.NewInt(int64(groupBalanceDiff))
 	}
-	minPrivacyThreshold := DefaultMinPrivacyThreshold
 	if iMinPrivacyThreshold, err := strconv.Atoi(os.Getenv("MIN_PRIVACY_THRESHOLD")); err == nil {
-		minPrivacyThreshold = int64(iMinPrivacyThreshold)
+		config.MinPrivacyThreshold = int64(iMinPrivacyThreshold)
 	}
-	minAccuracy, err := strconv.ParseFloat(os.Getenv("MIN_ACCURACY"), 64)
-	if err != nil {
-		t.Fatalf("Error parsing MIN_ACCURACY: %v", err)
+	if minAccuracy, err := strconv.ParseFloat(os.Getenv("MIN_ACCURACY"), 64); err == nil {
+		config.MinAccuracy = minAccuracy
 	}
-	outliersThreshold, err := strconv.ParseFloat(os.Getenv("OUTLIERS_THRESHOLD"), 64)
-	if err != nil {
-		outliersThreshold = DefaultOutliersThreshold
-	}
-
-	config := GroupsConfig{
-		GroupBalanceDiff:    big.NewInt(int64(groupBalanceDiff)),
-		MinPrivacyThreshold: minPrivacyThreshold,
-		MinAccuracy:         minAccuracy,
-		OutliersThreshold:   outliersThreshold,
+	if outliersThreshold, err := strconv.ParseFloat(os.Getenv("OUTLIERS_THRESHOLD"), 64); err == nil {
+		config.OutliersThreshold = outliersThreshold
 	}
 	t.Logf("current configuration: %+v", config)
+	t.Logf("census size: %d", len(census))
 
 	roundedCensus, accuracy, err := GroupAndRoundCensus(census, config)
 	if err != nil {
@@ -161,6 +151,6 @@ func TestAutoRoundingAlgorithm(t *testing.T) {
 	if _, err := fd.Write(jsonData); err != nil {
 		t.Fatalf("Error writing data: %v", err)
 	}
-	t.Logf("MinAccuracy: %.2f, Accuracy: %.2f%%, Groups: %d, Holders: %d\n",
-		minAccuracy, accuracy, len(groupsCounters), len(census))
+	t.Logf("Final Accuracy: %.2f%%, Number of Groups: %d, Final Holders: %d\n",
+		accuracy, len(groupsCounters), len(census))
 }

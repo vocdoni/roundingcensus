@@ -1,4 +1,4 @@
-module roundedcensus
+module github.com/vocdoni/roundedcensus
 
 go 1.21.5
 
